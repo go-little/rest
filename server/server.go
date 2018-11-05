@@ -4,39 +4,32 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type HTTPServer struct {
-	Server *http.Server
+	*http.Server
 }
 
 // Start initialize the HTTP server
-func Start(handler http.Handler) *HTTPServer {
-
-	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", config.port),
-		WriteTimeout: config.httpWriteTimeout,
-		ReadTimeout:  config.httpReadTimeout,
-		IdleTimeout:  config.httpIdleTimeout,
-		Handler:      handler,
-	}
+func Start(config *http.Server) *HTTPServer {
 
 	go func() {
-		fmt.Printf("Starting HTTP Server on port %d\n", config.port)
-		if err := server.ListenAndServe(); err != nil {
+		fmt.Printf("Starting HTTP Server on port %s\n", config.Addr)
+		if err := config.ListenAndServe(); err != nil {
 			fmt.Printf("Error on start server: %v\n", err)
 		}
 	}()
 
 	return &HTTPServer{
-		Server: server,
+		Server: config,
 	}
 }
 
 func (h *HTTPServer) Stop() {
-	ctx, cancel := context.WithTimeout(context.Background(), config.httpGracefulShutdown)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	h.Server.Shutdown(ctx)
+	h.Shutdown(ctx)
 	fmt.Println("HTTP Server shutting down!")
 }

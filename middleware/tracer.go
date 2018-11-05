@@ -12,28 +12,42 @@ import (
 	"github.com/go-little/rest/response"
 
 	"github.com/go-little/rest/tracer"
+
+	newrelic "github.com/newrelic/go-agent"
 )
 
+type TracerMiddlewareConfig struct {
+	LoggerConfig   tracer.LoggerConfig
+	NewrelicConfig newrelic.Config
+}
+
 // TracerMiddleware comment
-func TracerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TracerMiddleware(config TracerMiddlewareConfig) func(next http.Handler) http.Handler {
 
-		tracer.Start(w, r)
-		defer tracer.End(r.Context())
+	tracer.Config(config.LoggerConfig, config.NewrelicConfig)
 
-		ctx := r.Context()
+	return func(next http.Handler) http.Handler {
 
-		segment := tracer.StartSegment(ctx, "http")
-		defer segment.End()
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		putSegmentRequestAttr(segment, r)
+			tracer.Start(w, r)
+			defer tracer.End(r.Context())
 
-		rw := response.NewResponseWriterWrapper(w)
-		next.ServeHTTP(rw, r)
+			ctx := r.Context()
 
-		putSegmentResponseAttr(segment, rw)
+			segment := tracer.StartSegment(ctx, "http")
+			defer segment.End()
 
-	})
+			putSegmentRequestAttr(segment, r)
+
+			rw := response.NewResponseWriterWrapper(w)
+			next.ServeHTTP(rw, r)
+
+			putSegmentResponseAttr(segment, rw)
+
+		})
+
+	}
 }
 
 func putSegmentRequestAttr(segment *tracer.Segment, r *http.Request) {
@@ -58,6 +72,6 @@ func putSegmentRequestAttr(segment *tracer.Segment, r *http.Request) {
 
 func putSegmentResponseAttr(segment *tracer.Segment, rw *response.ResponseWriterWrapper) {
 	segment.Attr("response_header", rw.Header())
-	segment.Attr("status_code", rw.StatusCode)
+	segment.Attr("response_status_code", rw.StatusCode)
 	segment.Attr("response_body", string(rw.Body))
 }
