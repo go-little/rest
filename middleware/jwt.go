@@ -3,7 +3,6 @@ package middleware
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/go-little/rest/reply"
 	"github.com/gorilla/mux"
@@ -11,12 +10,36 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
-// JWTMiddleware comment
-func JWTMiddleware(authRoutes []*mux.Route) func(next http.Handler) http.Handler {
+type JWTMiddlewareConfig struct {
+	JWTKey                string
+	AuthorizationHeader   string
+	UnathorizedStatusCode int
+	UnathorizedBody       []byte
+	UnathorizedJSON       interface{}
+}
 
-	jwtKey := os.Getenv("JWT_KEY")
+// JWTMiddleware comment
+func JWTMiddleware(config JWTMiddlewareConfig, authRoutes []*mux.Route) func(next http.Handler) http.Handler {
+
+	jwtKey := config.JWTKey
 	if jwtKey != "" {
-		fmt.Printf("JWT auth enabled with key: %v\n", jwtKey)
+		fmt.Printf("JWT auth enabled with key: %s\n", jwtKey)
+	}
+
+	authorizationHeader := "authorization"
+	if config.AuthorizationHeader != "" {
+		authorizationHeader = config.AuthorizationHeader
+	}
+
+	unathorizedStatusCode := 401
+	if config.UnathorizedStatusCode != 0 {
+		unathorizedStatusCode = config.UnathorizedStatusCode
+	}
+
+	unathorizedBody := config.UnathorizedBody
+	unathorizedJSON := config.UnathorizedJSON
+	if unathorizedBody == nil && unathorizedJSON == nil {
+		unathorizedJSON = map[string]string{"message": "unathorized"}
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -33,18 +56,24 @@ func JWTMiddleware(authRoutes []*mux.Route) func(next http.Handler) http.Handler
 				}
 			}
 
-			if jwtKey != "" && authEnable {
+			if config.JWTKey != "" && authEnable {
 
-				authorizationToken := r.Header.Get("authorization")
+				authorizationToken := r.Header.Get(authorizationHeader)
 				token, err := jwt.Parse(authorizationToken, func(token *jwt.Token) (interface{}, error) {
 					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 						return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 					}
-					return []byte(jwtKey), nil
+					return []byte(config.JWTKey), nil
 				})
 
 				if err != nil || !token.Valid {
-					reply.StatusCode(401).JSON(map[string]string{"message": "unathorized"}).Do(w)
+					re := reply.StatusCode(unathorizedStatusCode)
+					if unathorizedBody != nil {
+						re = re.Body(unathorizedBody)
+					} else if unathorizedJSON != nil {
+						re = re.JSON(unathorizedJSON)
+					}
+					re.Do(w)
 					return
 				}
 

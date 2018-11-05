@@ -1,19 +1,43 @@
 package tracer
 
 import (
+	"fmt"
+	"io/ioutil"
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/luizalabs/burzumlogs-sdk/go-burzumlogs-sdk/logzum"
 )
 
-// RootLogger comment
-func RootLogger() *logrus.Logger {
+type LoggerConfig struct {
+	Stdout       bool
+	BurzumToken  string
+	BurzumConfig logzum.Config
+}
 
-	rootLogger := logrus.New()
+// NewLogger comment
+func NewLogger(config LoggerConfig) *logrus.Logger {
 
-	rootLogger.Formatter = &logrus.JSONFormatter{
+	logger := logrus.New()
+
+	logger.Formatter = &logrus.JSONFormatter{
 		TimestampFormat: time.RFC3339,
 	}
 
-	return rootLogger
+	if !config.Stdout {
+		logger.Out = ioutil.Discard
+	}
+
+	if config.BurzumToken != "" {
+		burzumHook, err := logzum.New(config.BurzumToken)
+		if err != nil {
+			fmt.Printf("Error on start Burzum Hook: %v", err)
+		} else {
+			logger.AddHook(burzumHook)
+			fmt.Printf("burzum logs with token: %s\n", config.BurzumToken)
+		}
+	}
+
+	return logger
 }
