@@ -46,7 +46,7 @@ func (n *NewrelicWrapper) newrelicTransaction(w http.ResponseWriter, r *http.Req
 		method, _ := route.GetMethods()
 		pathPattern, _ := route.GetPathTemplate()
 
-		txnName := fmt.Sprintf("%s (%s)", pathPattern, method)
+		txnName := fmt.Sprintf("%s %s", pathPattern, method)
 		txn := n.Application.StartTransaction(txnName, w, r)
 
 		return txn

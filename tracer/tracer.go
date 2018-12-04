@@ -71,7 +71,7 @@ func StartSegment(ctx context.Context, name string) *Segment {
 	tracerI := ctx.Value(TRACER_CTX_KEY)
 	if tracer, ok := tracerI.(*tracer); ok {
 		s.tracer = tracer
-		s.segment = newrelicWrapper.newrelicStartSegment(tracer.newrelicTransaction, name)
+		s.segment = newrelicWrapper.newrelicStartSegment(tracer.newrelicTransaction, s.name)
 	}
 
 	return s
